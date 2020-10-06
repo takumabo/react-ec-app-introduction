@@ -1,0 +1,164 @@
+ここでは認証のリッスンの実装を紹介します。
+
+流れは以下のようになります。
+1.Firebase auth関数の紹介
+2.リッスンのための関数
+3.Reactの子要素の出力(Containent)について
+4.Authコンポーネントの作成について
+5.パスワードリセットの画面作成
+
+です。
+リッスンとは簡単に言えば、ブラウザを閉じたとしてもユーザーがログインのママの状態にすることを指します。
+通常はそのサイトから離れるとアカウントはサインアウトとなります。
+リッスン機能を備えることである条件下ではログインしたままの状態を保つことができます。
+
+さて、今回はこのリッスンのために1.Firebase Auth関数についていくつか抑えていきましょう。
+
+1.Firebase Auth関数
+まずは前回使った関数の復習です。
+```
+createUserWithEmailAndPassword(){}
+signInWithEmailAndPassword(){}
+```
+です。
+どちらの関数も引数はstring(emailもpasswordも)でもちます。
+さらに戻り値はPromise<firebase.auth.UserCredential>を返します。
+戻り値の説明はどういうことかというと、
+前回PormiseのsignInのコードで.then()を使いましたね。
+
+```
+.then(resukt => {
+const user = result.user
+)
+```
+
+singInでfirebase.authを実行してそれが通ればthen(次の処理)を走らせるという流れになります。
+また上のresultには認証の結果が入っています。取り出す時はresult.userやresult.passwordとしてあげることで取り出せます。
+
+次に紹介するAuthメソッドは新しいものです。
+
+onAuthStateChanged()とsendPasswordResetEmail()です。
+
+はじめにonAuthStateCahnged()メソッドですが、
+引数：なし
+戻り値：firebase.Observerかfirebase.Userとか
+役割：認証状態を監視して変化があったら戻り値を返す
+
+というものです。AuthのState(情報)がチェンジしたら、なので名前のまんまですね。
+
+
+次に、sendPasswordResetEmail()ですが、
+引数：email(string)
+戻り値；Promise<void>
+役割：Passwordリセットメールを送る
+
+これもそのまんまで、強いていうならPromiseが<void>を返すので、特に何か処理をするのではなく
+この関数を実行すればPWリセットメールが送れますよーというものです。
+
+以上でfirebase.Authメソッドの話は終わりになります。
+
+2.認証リッスンのための関数
+
+これから認証リッスンのための関数を生成していきます。
+reducksだのusers/operations.jsを開いてください。次の関数を追記してください。
+
+```
+export const listenAuthState = () =>{
+    return async(dispatch) => {
+        return auth.onAuthStateChanged((user) =>{
+            if(user){
+                    const uid = user.uid
+    
+                    db.collection('users').doc(uid).get()
+                    .then((snapshot) => {
+                        const data = snapshot.data()
+    
+                        dispatch(signInAction({
+                            isSignIn: true,
+                            role:data.role,
+                            uid: uid,
+                            username: data.username
+                        }))
+    
+                        dispatch(push('/'))
+                    })
+                
+
+            } else {
+                dispatch(push('/signin'))
+            }
+        })
+    }
+}
+```
+ざっくり説明すると、最初にasyncまでを記述するところまでが基本形で返す値としてauth.onAuthStateChanged()を指定しています。
+onAuthStateChanged()の中身でuserがログインしているかどうかを確認します。if(user){}はuserが存在したら、という意味です。
+そこからuserの値を取得してsignInAction()でログインしています。
+else以下はdispath()でsigninのURLへ飛ばしています。
+
+ここまででリッスン関数の作成は終了しました。早いですね。
+
+3.Reactの子要素の出力(Containment)について
+Reactの子要素の出力(Containment)にはいくつか抑えないといけない点があります。
+例えば、children特別なpropsがあり、reactで受け取った子要素を出力する時に使うものです。
+例えばサイドバーやダイアログのような汎用的な”入れ物”を表すコンポーネントで使われます。
+```
+const Auth = ({children}) => {
+ return children
+}
+
+export default Auth;
+```
+こうすることで受け取ったchildrenオブジェクトをそのまま出力することが可能になります。
+
+
+それではAuthコンポーネントの作成に写りましょう。
+Router.jsを以下のように変更しましょう。
+```
+        <Switch>
+            <Route exact path={"/signup"} component={SignUp} />
+            <Route exact path={"/signin"} component={SignIn} />
+              <Auth>
+                <Route exact path={"(/)?"} component={Home} />
+              </Auth>
+        </Switch>
+
+```
+
+認証が実行されてHomeに写るようにしたいので<Auth>でラッピングします。
+
+ではAuthコンポーネントをsrc/直下に作ります。
+
+```
+
+```
+
+
+次にreducks/users/selectors.jsに新しい関数を作りましょう。
+```
+import {createSelector} from 'reselect';
+const usersSelector = (state) =>state.users;
+
+export const getUserId = createSelector(
+    [usersSelector],
+    state => state.uid
+)
+
+export const getUsername = createSelector(
+    [usersSelector],
+    state => state.username
+)
+
+export const getIsSignIn = createSelector(
+    [usersSelector],
+    state => state.issSignIn
+)
+```
+              
+              
+              
+              
+              
+              
+              
+              
